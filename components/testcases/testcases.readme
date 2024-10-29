@@ -1,0 +1,61 @@
+The testcases,{c,h} provide a function that allows you to test your SHA-256
+hash and RSA-decrypt implementations. Both are needed with the signatures.
+
+1. INTEGRATION
+
+- Add testcases.c to your CMakefile
+
+- Add a command to run test_signatures() to your user interface.
+  Function is defined in testcases.h, so include that!
+
+- Function takes two parameters, which are function pointers
+  to (i) SHA-256 and (ii) RSA-decryption. These are functions
+  you need to implement (which then call library routines).
+
+- Check testcases.h for their definition (and also testcases.c
+  for details).
+
+
+2. OPERATION
+
+- When test_signatures is called, it first runs two tests on SHA-256
+  and prints out the expected output, and output from your routine.
+
+  a) SHA-256 for a single letter, 'a'
+  b) SHA-256 for a handcrafted LowNet frame (testframe_1)
+  
+- Next it calls RSA-decrypt function you provided for
+  a (valid) signature block corresponding to the testframe_1.
+  The two parts of the signature have been combined.
+  The test routine compares the output to the expected, and
+  reports the number of errors (probably zero, or MANY).
+
+
+3. EXPECTED OUTPUT
+
+When the test routine is called, if all is well, you see
+the following output in the serial interface:
+-----
+SHA-256 on letter a  (=> ca978112ca1bbdcafa... ?)
+ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb   <== your routine
+SHA-256 on test frame, the h_m (=> 4afdb5cf4fc366b4932... ?)
+4afdb5cf4fc366b493229e05182121342099d80b0651523537834ddba10c7871   <== your routine
+Decoding the test signature ... (220 zeroes, 4 ones, and h_m?)
+ 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+ 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+ 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+ 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+ 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+ 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+ 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+ 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+ 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+ 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+ 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+ 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+ 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+ 00,00,00,00,00,00,00,00,00,00,00,00,01,01,01,01
+ 4a,fd,b5,cf,4f,c3,66,b4,93,22,9e,05,18,21,21,34   <== same signature as above!
+ 20,99,d8,0b,06,51,52,35,37,83,4d,db,a1,0c,78,71
+- Valid signature recovered!
+-----
