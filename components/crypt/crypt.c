@@ -14,6 +14,8 @@
 
 void crypt_decrypt(const lownet_secure_frame_t* cipher, lownet_secure_frame_t* plain) {
     const lownet_key_t* key = lownet_get_key();
+    unsigned char ivt[LOWNET_IVT_SIZE];
+    memcpy(ivt, &cipher->ivt, LOWNET_IVT_SIZE);
 
     esp_aes_context ctx;
     esp_aes_init(&ctx);
@@ -23,18 +25,22 @@ void crypt_decrypt(const lownet_secure_frame_t* cipher, lownet_secure_frame_t* p
         return;
     }
 
-    esp_aes_crypt_cbc(
+    memcpy(plain, cipher, LOWNET_UNENCRYPTED_SIZE + LOWNET_IVT_SIZE);
+    int result = esp_aes_crypt_cbc(
         &ctx,
         ESP_AES_DECRYPT,
         LOWNET_ENCRYPTED_SIZE,
-        (uint8_t*)&cipher->ivt,
+        ivt,
         (uint8_t*)&cipher->protocol,
         (uint8_t*)&plain->protocol);
     esp_aes_free(&ctx);
+    if (result) ESP_LOGE("DECRYPTION", "Decryption failed");
 }
 
 void crypt_encrypt(const lownet_secure_frame_t* plain, lownet_secure_frame_t* cipher) {
     const lownet_key_t* key = lownet_get_key();
+    unsigned char ivt[LOWNET_IVT_SIZE];
+    memcpy(ivt, &plain->ivt, LOWNET_IVT_SIZE);
 
     esp_aes_context ctx;
     esp_aes_init(&ctx);
@@ -44,14 +50,16 @@ void crypt_encrypt(const lownet_secure_frame_t* plain, lownet_secure_frame_t* ci
         return;
     }
 
-    esp_aes_crypt_cbc(
+    memcpy(cipher, plain, LOWNET_UNENCRYPTED_SIZE + LOWNET_IVT_SIZE);
+    int result = esp_aes_crypt_cbc(
         &ctx,
         ESP_AES_ENCRYPT,
         LOWNET_ENCRYPTED_SIZE,
-        (uint8_t*)&plain->ivt,
+        ivt,
         (uint8_t*)&plain->protocol,
         (uint8_t*)&cipher->protocol);
     esp_aes_free(&ctx);
+    if (result) ESP_LOGE("ENCRYPTION", "Encryption failed");
 }
 
 uint8_t char_to_hex(char c) {
@@ -120,6 +128,7 @@ void crypt_setkey_command(char* args) {
     printf("\n");
 }
 
+void print_secure_frame(const lownet_secure_frame_t* frame);
 void crypt_test_command(char* str) {
     if (!str)
         return;
@@ -155,6 +164,7 @@ void crypt_test_command(char* str) {
         serial_write_line("Unencrypted part of frame not preserved!");
         return;
     }
+
     if (memcmp(&plain.ivt, &cipher.ivt, LOWNET_IVT_SIZE) != 0) {
         serial_write_line("IVT not preserved!");
         return;
@@ -178,28 +188,19 @@ void crypt_test_command(char* str) {
              memcmp(&plain.protocol, &back.protocol, LOWNET_ENCRYPTED_SIZE) == 0 ? "Same" : "Different");
     serial_write_line(msg);
 
-    printf("\n--------Payload Before Encryption--------\n");
-    for (int i = 0; i < sizeof(lownet_secure_frame_t); i++) {
-        uint8_t byte = ((uint8_t*)&plain)[i];
-        printf("%02x[%c]%c", byte, (byte > 31 && byte < 127) ? byte : ' ', ((i & 0xF) != 0xF) ? ' ' : '\n');
-    }
-    printf("\n");
-
-    crypt_encrypt(&plain, &cipher);
-    printf("--------Payload After Encryption--------\n");
-    for (int i = 0; i < sizeof(lownet_secure_frame_t); i++) {
-        uint8_t byte = ((uint8_t*)&cipher)[i];
-        printf("%02x[%c]%c", byte, (byte > 31 && byte < 127) ? byte : ' ', ((i & 0xF) != 0xF) ? ' ' : '\n');
-    }
-    printf("\n");
-
-    crypt_decrypt(&cipher, &back);
-    printf("--------Payload After Decryption--------\n");
-    for (int i = 0; i < sizeof(lownet_secure_frame_t); i++) {
-        uint8_t byte = ((uint8_t*)&back)[i];
-        printf("%02x[%c]%c", byte, (byte > 31 && byte < 127) ? byte : ' ', ((i & 0xF) != 0xF) ? ' ' : '\n');
-    }
-    printf("\n");
+    // printf("\n--------Payload Before Encryption--------\n");
+    // print_secure_frame(&plain);
+    // printf("\n");
+    //
+    // crypt_encrypt(&plain, &cipher);
+    // printf("--------Payload After Encryption--------\n");
+    // print_secure_frame(&cipher);
+    // printf("\n");
+    //
+    // crypt_decrypt(&cipher, &back);
+    // printf("--------Payload After Decryption--------\n");
+    // print_secure_frame(&back);
+    // printf("\n");
 }
 
 /*
@@ -241,4 +242,11 @@ void rsa(const uint8_t* data, uint8_t* output) {
         serial_write_line("Error in decryption");
     }
     mbedtls_pk_free(&pk);
+}
+
+void print_secure_frame(const lownet_secure_frame_t* frame) {
+    for (int i = 0; i < sizeof(lownet_secure_frame_t); i++) {
+        uint8_t byte = ((uint8_t*)frame)[i];
+        printf("%02x[%c]%c", byte, (byte > 31 && byte < 127) ? byte : ' ', ((i & 0xF) != 0xF) ? ' ' : '\n');
+    }
 }
